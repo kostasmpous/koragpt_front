@@ -1,15 +1,14 @@
-import '../styles/globals.css'
-import Sidebar from '../components/Sidebar'
+// src/pages/_app.js
+import "@/styles/globals.css";
+import Sidebar from "@/components/Sidebar";
 
-function MyApp({ Component, pageProps }) {
+export default function MyApp({ Component, pageProps }) {
     return (
-        <div className="flex">
-            <Sidebar />
-            <main className="flex-1 min-h-screen bg-white">
-                <Component {...pageProps} />
+        <div className="flex h-screen">
+            <Sidebar />                          {/* left column (always visible) */}
+            <main className="flex-1 overflow-auto bg-white">
+                <Component {...pageProps} />       {/* right column (changes by route) */}
             </main>
         </div>
-    )
+    );
 }
-
-export default MyApp
