@@ -3,16 +3,18 @@
 import Image from "next/image";
 import Link from "next/link";
 import { useRouter } from "next/router";
-import { Plus, Sparkles, Moon, Settings, RotateCcw, Loader2 } from "lucide-react";
+import { Plus, Sparkles, Moon, Settings, RotateCcw, Loader2, LogOut } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
-import axios from "axios";
+import api from "@/lib/api";
+import { useAuth } from "@/context/AuthContext";
 
-const BASE_URL = "http://localhost:8080";
-const userId = 1; // hardcoded
 const REFRESH_MS = 8000; // how often to check for updates
 
 export default function Sidebar() {
     const router = useRouter();
+    const { user, logout } = useAuth();            // 🔐 current user + logout
+    const userId = user?.id;                       // <- from JWT login
+
     const activeId = router.pathname.startsWith("/chat/") ? router.query?.id : null;
 
     const [chats, setChats] = useState([]);
@@ -23,15 +25,17 @@ export default function Sidebar() {
     const inFlight = useRef(false); // prevent overlapping loads
 
     const loadChats = async (controller) => {
+        if (!userId) return;           // no user yet
         if (inFlight.current) return;
+
         try {
             inFlight.current = true;
-            if (!chats.length) setLoading(true); // show skeletons only on first load
+            if (!chats.length) setLoading(true);
             setErr(null);
 
-            const res = await axios.get(`${BASE_URL}/api/chats/users/${userId}/chats`, {
+            // JWT header is added by api instance
+            const res = await api.get(`/api/chats/users/${userId}/chats`, {
                 signal: controller?.signal,
-                headers: { Accept: "application/json" },
             });
 
             const data = Array.isArray(res.data) ? res.data : [];
@@ -44,23 +48,25 @@ export default function Sidebar() {
 
             setChats(items);
         } catch (e) {
-            if (!axios.isCancel(e)) setErr(e?.message || "Failed to load chats");
+            if (e.name !== "CanceledError") setErr(e?.message || "Failed to load chats");
         } finally {
             setLoading(false);
             inFlight.current = false;
         }
     };
 
-    // initial load
+    // initial load when userId available
     useEffect(() => {
+        if (!userId) return;
         const controller = new AbortController();
         loadChats(controller);
         return () => controller.abort();
         // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, []);
+    }, [userId]);
 
-    // 🔁 periodic refresh + refetch on focus
+    // periodic refresh + refetch on focus
     useEffect(() => {
+        if (!userId) return;
         const controller = new AbortController();
 
         const tick = () => loadChats(controller);
@@ -77,24 +83,21 @@ export default function Sidebar() {
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [userId]);
 
-    // ➕ Create new chat
+    // Create new chat for the logged-in user
     const handleNewChat = async () => {
-        if (creating) return;
+        if (!userId || creating) return;
         setCreating(true);
         try {
-            const res = await axios.post(`${BASE_URL}/api/chats`, { userId: String(userId) });
+            const res = await api.post(`/api/chats`, { userId: String(userId) });
             const newChat = res.data;
             const newId = newChat?.id ?? newChat?.chatId;
 
             // Optimistic add
-            setChats((prev) => [
-                { id: newId, title: newChat?.title || "New Chat" },
-                ...prev,
-            ]);
+            setChats((prev) => [{ id: newId, title: newChat?.title || "New Chat" }, ...prev]);
 
             if (newId != null) router.push(`/chat/${newId}`);
 
-            // ensure server & client lists are in sync
+            // sync with server
             loadChats();
         } catch (e) {
             console.error("Failed to create chat", e);
@@ -104,13 +107,25 @@ export default function Sidebar() {
         }
     };
 
+    // If not authenticated yet, render nothing (ProtectedRoute handles redirect)
+    if (!userId) return null;
+
     return (
         <aside className="flex flex-col justify-between w-64 h-screen bg-gradient-to-b from-blue-50 to-blue-100 text-slate-700 border-r border-blue-200 p-4">
             {/* Top Section */}
             <div>
-                <div className="flex items-center gap-2 mb-6">
-                    <Image src="/logo.png" alt="KoraGPT logo" width={80} height={90} priority />
-                    <span className="font-serif text-xl font-bold text-blue-600">KoraGPT</span>
+                <div className="flex items-center justify-between mb-6">
+                    <div className="flex items-center gap-2">
+                        <Image src="/logo.png" alt="KoraGPT logo" width={36} height={36} priority />
+                        <span className="font-serif text-xl font-bold text-blue-600">KoraGPT</span>
+                    </div>
+                    <button
+                        onClick={logout}
+                        className="p-2 rounded-md hover:bg-blue-200 text-slate-700"
+                        title="Log out"
+                    >
+                        <LogOut className="w-4 h-4" />
+                    </button>
                 </div>
 
                 <button
