@@ -2,13 +2,16 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import axios from "axios";
+import axios from "axios";        // for axios.isCancel
+import api from "@/lib/api";
+import { useAuth } from "@/context/AuthContext";
 
-const BASE_URL = "http://localhost:8080";
-const USER_ID = 1; // TODO: replace with auth later
 const MAX_LEN = 5000;
 
 export default function Composer({ chatId, model, onSent }) {
+    const { user, ready } = useAuth();
+    const userId = user?.id;
+
     const [value, setValue] = useState("");
     const [sending, setSending] = useState(false);
     const [error, setError] = useState(null);
@@ -25,35 +28,34 @@ export default function Composer({ chatId, model, onSent }) {
 
     const send = async () => {
         const text = value.trim();
-        if (!text || sending || !chatId) return;
+        if (!ready || !text || sending || !chatId || !userId || !model)return;
 
         setSending(true);
         setError(null);
 
-        // enable cancel
         const controller = new AbortController();
         abortRef.current = controller;
 
         try {
-            await axios.post(
-                `${BASE_URL}/api/messages`,
+            await api.post(
+                `/api/messages`,
                 {
                     text,
                     chatId: Number(chatId),
-                    userId: USER_ID,
-                    model: model || "gpt-4o-mini", // fallback if dropdown hasn't loaded
+                    userId: userId,                 // from auth
+                    model: model || "gpt-4o-mini",  // fallback
                 },
                 { signal: controller.signal }
             );
 
             setValue("");
-            onSent?.(); // refresh messages (your poller will also keep it fresh)
+            onSent?.(); // refresh messages
         } catch (e) {
-            if (axios.isCancel(e)) {
-                // user pressed Stop
+            if (axios.isCancel(e) || e?.code === "ERR_CANCELED") {
+                // user pressed Stop — ignore
             } else {
                 console.error("Failed to send message", e);
-                setError(e?.message || "Failed to send message");
+                setError(e?.response?.data?.message || e?.message || "Failed to send message");
             }
         } finally {
             setSending(false);
@@ -70,10 +72,8 @@ export default function Composer({ chatId, model, onSent }) {
     };
 
     const onKeyDown = (e) => {
-        // IME composition guard
-        if (e.nativeEvent.isComposing) return;
-
-        // Enter to send, Shift+Enter newline
+        if (e.nativeEvent.isComposing) return; // IME guard
+        // Enter to send (no Shift/Ctrl/Cmd)
         if (e.key === "Enter" && !e.shiftKey && !e.ctrlKey && !e.metaKey) {
             e.preventDefault();
             send();
@@ -87,7 +87,7 @@ export default function Composer({ chatId, model, onSent }) {
     };
 
     const remaining = MAX_LEN - value.length;
-    const disabled = sending || !value.trim() || !chatId;
+    const disabled = sending || !value.trim() || !chatId || !userId || !model;
 
     return (
         <div className="p-4 border-t bg-white">
@@ -102,6 +102,7 @@ export default function Composer({ chatId, model, onSent }) {
             rows={1}
             maxLength={MAX_LEN}
             aria-label="Message input"
+            disabled={sending}
         />
 
                 {!sending ? (
@@ -141,7 +142,6 @@ export default function Composer({ chatId, model, onSent }) {
 
             {error && <div className="mt-2 text-xs text-red-600">Error: {error}</div>}
 
-            {/* Model hint (optional, nice for debugging) */}
             <div className="mt-1 text-[11px] text-slate-400">
                 Using model: <span className="font-medium">{model || "loading…"}</span>
             </div>

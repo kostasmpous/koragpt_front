@@ -1,14 +1,17 @@
 // src/pages/chat/[id].js
+"use client";
+
 import { useRouter } from "next/router";
 import { useEffect, useRef, useState, useCallback } from "react";
-import axios from "axios";
+import api from "@/lib/api";
+import { useAuth } from "@/context/AuthContext";
 import Composer from "@/components/Composer";
-
-const BASE_URL = "http://localhost:8080";
 
 export default function ChatPage() {
     const { query } = useRouter();
     const chatId = query.id;
+
+    const { ready, token } = useAuth();
 
     const [loading, setLoading] = useState(true);
     const [err, setErr] = useState(null);
@@ -20,14 +23,14 @@ export default function ChatPage() {
 
     const scrollRef = useRef(null);
 
-    // fetch available models
+    // fetch available models (after auth ready)
     useEffect(() => {
+        if (!ready || !token) return;
         let active = true;
+
         (async () => {
             try {
-                const res = await axios.get(`${BASE_URL}/api/modelsai/OpenAI`, {
-                    headers: { Accept: "application/json" },
-                });
+                const res = await api.get(`/api/modelsai/OpenAI`);
                 const arr = Array.isArray(res.data) ? res.data : [];
                 if (!active) return;
                 setModels(arr);
@@ -36,16 +39,17 @@ export default function ChatPage() {
                 console.error("Failed to load models", e);
             }
         })();
-        return () => { active = false; };
-    }, [model]);
+
+        return () => {
+            active = false;
+        };
+    }, [ready, token, model]);
 
     // normalize + fetch messages
     const fetchMessages = useCallback(async () => {
-        if (!chatId) return;
+        if (!chatId || !ready || !token) return;
         try {
-            const res = await axios.get(`${BASE_URL}/api/chats/${chatId}`, {
-                headers: { Accept: "application/json" },
-            });
+            const res = await api.get(`/api/chats/${chatId}`);
             const data = res.data ?? {};
             const list = Array.isArray(data.text)
                 ? data.text.map((t) => ({
@@ -60,18 +64,21 @@ export default function ChatPage() {
         } finally {
             setLoading(false);
         }
-    }, [chatId]);
+    }, [chatId, ready, token]);
 
-    // initial + polling
+    // initial + polling (only when auth is ready)
     useEffect(() => {
-        if (!chatId) return;
+        if (!chatId || !ready || !token) return;
         let active = true;
         fetchMessages();
         const interval = setInterval(() => {
             if (active) fetchMessages();
         }, 3000);
-        return () => { active = false; clearInterval(interval); };
-    }, [chatId, fetchMessages]);
+        return () => {
+            active = false;
+            clearInterval(interval);
+        };
+    }, [chatId, ready, token, fetchMessages]);
 
     // auto-scroll
     useEffect(() => {
@@ -79,12 +86,13 @@ export default function ChatPage() {
         scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
     }, [messages.length]);
 
+    if (!ready) return null; // wait until auth state is hydrated
     if (loading) return <div className="p-6 text-slate-500">Loading chat…</div>;
     if (err) return <div className="p-6 text-red-600">Error: {err}</div>;
 
     return (
         <div className="h-full w-full flex flex-col">
-            {/* 🔽 Replace Chat #{chatId} with just the model dropdown */}
+            {/* header with model dropdown */}
             <header className="px-6 py-4 border-b bg-slate-50 flex items-center gap-2">
                 <label htmlFor="model-select" className="text-sm font-medium text-black">
                     Model:
@@ -107,14 +115,14 @@ export default function ChatPage() {
             <div ref={scrollRef} className="flex-1 overflow-auto p-6 space-y-1">
                 {messages.map((m, i) => {
                     const prevRole = i > 0 ? messages[i - 1].role : null;
-                    const newGroup = i === 0 || m.role !== prevRole; // extra space when speaker switches
+                    const newGroup = i === 0 || m.role !== prevRole;
 
                     const base =
                         "max-w-[75%] px-4 py-3 rounded-2xl shadow-sm whitespace-pre-wrap break-words";
                     const userCls =
-                        "ml-auto bg-blue-600 text-white rounded-br-none"; // user on RIGHT, bold color
+                        "ml-auto bg-blue-600 text-white rounded-br-none"; // user on RIGHT
                     const aiCls =
-                        "bg-white text-black border border-slate-200 rounded-bl-none"; // assistant on LEFT, light card
+                        "bg-white text-black border border-slate-200 rounded-bl-none"; // assistant on LEFT
 
                     return (
                         <div
@@ -128,8 +136,6 @@ export default function ChatPage() {
                     );
                 })}
             </div>
-
-
 
             <Composer chatId={chatId} model={model} onSent={fetchMessages} />
         </div>

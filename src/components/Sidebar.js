@@ -8,12 +8,13 @@ import { useEffect, useRef, useState } from "react";
 import api from "@/lib/api";
 import { useAuth } from "@/context/AuthContext";
 
-const REFRESH_MS = 8000; // how often to check for updates
+const REFRESH_MS = 8000; // sensible poll
+const ERROR_BACKOFF_MS = 4000;
 
 export default function Sidebar() {
     const router = useRouter();
-    const { user, logout } = useAuth();            // 🔐 current user + logout
-    const userId = user?.id;                       // <- from JWT login
+    const { user, logout, ready } = useAuth();     // 🔐 wait for auth hydration
+    const userId = user?.id;
 
     const activeId = router.pathname.startsWith("/chat/") ? router.query?.id : null;
 
@@ -22,55 +23,60 @@ export default function Sidebar() {
     const [err, setErr] = useState(null);
     const [creating, setCreating] = useState(false);
 
-    const inFlight = useRef(false); // prevent overlapping loads
+    const inFlight = useRef(false);
+    const lastErrorAt = useRef(0);
 
-    const loadChats = async (controller) => {
-        if (!userId) return;           // no user yet
+    async function loadChats() {
+        if (!ready || !userId) return;
         if (inFlight.current) return;
+        if (document.visibilityState === "hidden") return; // don’t fetch in bg tab
 
+        // simple backoff after errors
+        const sinceErr = Date.now() - lastErrorAt.current;
+        if (sinceErr < ERROR_BACKOFF_MS) return;
+
+        const controller = new AbortController();
         try {
             inFlight.current = true;
             if (!chats.length) setLoading(true);
             setErr(null);
 
-            // JWT header is added by api instance
             const res = await api.get(`/api/chats/users/${userId}/chats`, {
-                signal: controller?.signal,
+                signal: controller.signal,
             });
 
             const data = Array.isArray(res.data) ? res.data : [];
             const items = data
-                .map((x) => ({
-                    id: x.chatId,
-                    title: x.text || "Untitled chat",
-                }))
+                .map((x) => ({ id: x.chatId, title: x.text || "Untitled chat" }))
                 .filter((x) => x.id != null);
 
             setChats(items);
         } catch (e) {
-            if (e.name !== "CanceledError") setErr(e?.message || "Failed to load chats");
+            // Axios cancel has name "CanceledError"; ignore cancels
+            if (e?.name !== "CanceledError") {
+                setErr(e?.message || "Failed to load chats");
+                lastErrorAt.current = Date.now();
+            }
         } finally {
             setLoading(false);
             inFlight.current = false;
+            controller.abort(); // ensure cleanup
         }
-    };
+    }
 
-    // initial load when userId available
+    // initial load when auth & user ready
     useEffect(() => {
-        if (!userId) return;
-        const controller = new AbortController();
-        loadChats(controller);
-        return () => controller.abort();
+        if (!ready || !userId) return;
+        loadChats();
         // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [userId]);
+    }, [ready, userId]);
 
-    // periodic refresh + refetch on focus
+    // periodic refresh + on focus
     useEffect(() => {
-        if (!userId) return;
-        const controller = new AbortController();
+        if (!ready || !userId) return;
 
-        const tick = () => loadChats(controller);
-        const onFocus = () => loadChats(controller);
+        const tick = () => loadChats();
+        const onFocus = () => loadChats();
 
         const id = setInterval(tick, REFRESH_MS);
         window.addEventListener("focus", onFocus);
@@ -78,10 +84,9 @@ export default function Sidebar() {
         return () => {
             clearInterval(id);
             window.removeEventListener("focus", onFocus);
-            controller.abort();
         };
         // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [userId]);
+    }, [ready, userId]);
 
     // Create new chat for the logged-in user
     const handleNewChat = async () => {
@@ -92,9 +97,7 @@ export default function Sidebar() {
             const newChat = res.data;
             const newId = newChat?.id ?? newChat?.chatId;
 
-            // Optimistic add
             setChats((prev) => [{ id: newId, title: newChat?.title || "New Chat" }, ...prev]);
-
             if (newId != null) router.push(`/chat/${newId}`);
 
             // sync with server
@@ -107,8 +110,8 @@ export default function Sidebar() {
         }
     };
 
-    // If not authenticated yet, render nothing (ProtectedRoute handles redirect)
-    if (!userId) return null;
+    // If not authenticated yet, render nothing (ProtectedRoute will redirect)
+    if (!ready || !userId) return null;
 
     return (
         <aside className="flex flex-col justify-between w-64 h-screen bg-gradient-to-b from-blue-50 to-blue-100 text-slate-700 border-r border-blue-200 p-4">
@@ -141,7 +144,6 @@ export default function Sidebar() {
 
                 <div className="text-sm font-semibold mb-2 text-blue-700">Recent Chats</div>
 
-                {/* Loading skeletons */}
                 {loading && (
                     <ul className="space-y-2">
                         {[...Array(5)].map((_, i) => (
@@ -150,7 +152,6 @@ export default function Sidebar() {
                     </ul>
                 )}
 
-                {/* Error with Retry */}
                 {!loading && err && (
                     <div className="text-xs text-red-600 flex items-center justify-between">
                         <span className="truncate pr-2">Error: {err}</span>
@@ -165,7 +166,6 @@ export default function Sidebar() {
                     </div>
                 )}
 
-                {/* Chats */}
                 {!loading && !err && (
                     <ul className="space-y-1 text-sm overflow-auto max-h-[300px] pr-1">
                         {chats.map((chat) => {
