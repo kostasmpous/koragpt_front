@@ -3,19 +3,26 @@
 import Image from "next/image";
 import Link from "next/link";
 import { useRouter } from "next/router";
-import { Plus, Sparkles, Moon, Settings, RotateCcw, Loader2, LogOut } from "lucide-react";
+import {
+    Plus,
+    Sparkles,
+    Moon,
+    Settings,
+    RotateCcw,
+    Loader2,
+    LogOut,
+} from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import api from "@/lib/api";
 import { useAuth } from "@/context/AuthContext";
 import SettingsDialog from "@/components/SettingsDialog";
-
 
 const REFRESH_MS = 8000000;
 const ERROR_BACKOFF_MS = 4000;
 
 export default function Sidebar() {
     const router = useRouter();
-    const { user, logout, ready } = useAuth();     // 🔐 wait for auth hydration
+    const { user, logout, ready } = useAuth();
     const userId = user?.id;
     const [showSettings, setShowSettings] = useState(false);
     const activeId = router.pathname.startsWith("/chat/") ? router.query?.id : null;
@@ -31,9 +38,8 @@ export default function Sidebar() {
     async function loadChats() {
         if (!ready || !userId) return;
         if (inFlight.current) return;
-        if (document.visibilityState === "hidden") return; // don’t fetch in bg tab
+        if (document.visibilityState === "hidden") return;
 
-        // simple backoff after errors
         const sinceErr = Date.now() - lastErrorAt.current;
         if (sinceErr < ERROR_BACKOFF_MS) return;
 
@@ -54,7 +60,6 @@ export default function Sidebar() {
 
             setChats(items);
         } catch (e) {
-            // Axios cancel has name "CanceledError"; ignore cancels
             if (e?.name !== "CanceledError") {
                 setErr(e?.message || "Failed to load chats");
                 lastErrorAt.current = Date.now();
@@ -62,18 +67,15 @@ export default function Sidebar() {
         } finally {
             setLoading(false);
             inFlight.current = false;
-            controller.abort(); // ensure cleanup
+            controller.abort();
         }
     }
 
-    // initial load when auth & user ready
     useEffect(() => {
         if (!ready || !userId) return;
         loadChats();
-        // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [ready, userId]);
 
-    // periodic refresh + on focus
     useEffect(() => {
         if (!ready || !userId) return;
 
@@ -87,10 +89,8 @@ export default function Sidebar() {
             clearInterval(id);
             window.removeEventListener("focus", onFocus);
         };
-        // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [ready, userId]);
 
-    // Create new chat for the logged-in user
     const handleNewChat = async () => {
         if (!userId || creating) return;
         setCreating(true);
@@ -99,10 +99,12 @@ export default function Sidebar() {
             const newChat = res.data;
             const newId = newChat?.id ?? newChat?.chatId;
 
-            setChats((prev) => [{ id: newId, title: newChat?.title || "New Chat" }, ...prev]);
+            setChats((prev) => [
+                { id: newId, title: newChat?.title || "New Chat" },
+                ...prev,
+            ]);
             if (newId != null) router.push(`/chat/${newId}`);
 
-            // sync with server
             loadChats();
         } catch (e) {
             console.error("Failed to create chat", e);
@@ -112,7 +114,6 @@ export default function Sidebar() {
         }
     };
 
-    // If not authenticated yet, render nothing (ProtectedRoute will redirect)
     if (!ready || !userId) return null;
 
     return (
@@ -121,35 +122,47 @@ export default function Sidebar() {
             <div>
                 <div className="flex items-center justify-between mb-6">
                     <div className="flex items-center gap-2">
-                        <Image src="/logo.png" alt="KoraGPT logo" width={36} height={36} priority />
-                        <span className="font-serif text-xl font-bold text-blue-600">KoraGPT</span>
+                        <Image
+                            src="/logo.png"
+                            alt="KoraGPT logo"
+                            width={36}
+                            height={36}
+                            priority
+                        />
+                        <span className="font-serif text-xl font-bold text-blue-600">
+              KoraGPT
+            </span>
                     </div>
-                    <button
-                        onClick={logout}
-                        className="p-2 rounded-md hover:bg-blue-200 text-slate-700"
-                        title="Log out"
-                    >
-                        <LogOut className="w-4 h-4" />
-                    </button>
                 </div>
 
                 <button
                     onClick={handleNewChat}
                     disabled={creating}
                     className={`flex items-center justify-center gap-2 px-3 py-2 mb-4 rounded-md w-full transition text-white ${
-                        creating ? "bg-blue-400 cursor-not-allowed" : "bg-blue-600 hover:bg-blue-700"
+                        creating
+                            ? "bg-blue-400 cursor-not-allowed"
+                            : "bg-blue-600 hover:bg-blue-700"
                     }`}
                 >
-                    {creating ? <Loader2 className="w-4 h-4 animate-spin" /> : <Plus className="w-4 h-4" />}
+                    {creating ? (
+                        <Loader2 className="w-4 h-4 animate-spin" />
+                    ) : (
+                        <Plus className="w-4 h-4" />
+                    )}
                     {creating ? "Creating…" : "New Chat"}
                 </button>
 
-                <div className="text-sm font-semibold mb-2 text-blue-700">Recent Chats</div>
+                <div className="text-sm font-semibold mb-2 text-blue-700">
+                    Recent Chats
+                </div>
 
                 {loading && (
                     <ul className="space-y-2">
                         {[...Array(5)].map((_, i) => (
-                            <li key={i} className="h-8 bg-blue-200/40 animate-pulse rounded-md" />
+                            <li
+                                key={i}
+                                className="h-8 bg-blue-200/40 animate-pulse rounded-md"
+                            />
                         ))}
                     </ul>
                 )}
@@ -178,20 +191,26 @@ export default function Sidebar() {
                                         href={`/chat/${chat.id}`}
                                         className={[
                                             "block px-3 py-2 rounded-lg transition",
-                                            isActive ? "bg-blue-600 text-white" : "text-blue-900 hover:bg-blue-200",
+                                            isActive
+                                                ? "bg-blue-600 text-white"
+                                                : "text-blue-900 hover:bg-blue-200",
                                         ].join(" ")}
                                         aria-current={isActive ? "page" : undefined}
                                         title={chat.title}
                                     >
                                         <div className="font-medium truncate">
-                                            {chat.title.length > 30 ? chat.title.slice(0, 30) + "…" : chat.title}
+                                            {chat.title.length > 30
+                                                ? chat.title.slice(0, 30) + "…"
+                                                : chat.title}
                                         </div>
                                     </Link>
                                 </li>
                             );
                         })}
                         {chats.length === 0 && (
-                            <li className="text-xs text-slate-500 px-1">No chats yet — start a new one!</li>
+                            <li className="text-xs text-slate-500 px-1">
+                                No chats yet — start a new one!
+                            </li>
                         )}
                     </ul>
                 )}
@@ -200,14 +219,25 @@ export default function Sidebar() {
             {/* Bottom Section */}
             <div className="space-y-2 text-sm">
 
-                <button className="flex items-center gap-2 px-2 py-1 hover:bg-blue-200 rounded-md w-full"
-
-                onClick={() => setShowSettings(true)}>
-                <Settings className="w-4 h-4" /> Settings
+                <button
+                    className="flex items-center gap-2 px-2 py-1 hover:bg-blue-200 rounded-md w-full"
+                    onClick={() => setShowSettings(true)}
+                >
+                    <Settings className="w-4 h-4" /> Settings
+                </button>
+                <button
+                    onClick={logout}
+                    className="flex items-center gap-2 px-2 py-1 hover:bg-red-200 rounded-md w-full text-red-600"
+                >
+                    <LogOut className="w-4 h-4" /> Log out
                 </button>
                 <div className="mt-3 text-xs text-blue-500">Free Plan 🌟</div>
             </div>
-        <SettingsDialog open={showSettings} onClose={() => setShowSettings(false)} />
+
+            <SettingsDialog
+                open={showSettings}
+                onClose={() => setShowSettings(false)}
+            />
         </aside>
     );
 }

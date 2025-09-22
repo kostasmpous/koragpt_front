@@ -1,40 +1,69 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/pages/api-reference/create-next-app).
+# KoraGPT Frontend
 
-## Getting Started
+> ⚡️ The frontend for this project is here: [koragpt_back](https://github.com/kostasmpous/koragpt_back)
 
-First, run the development server:
+KoraGPT is a **Next.js 15 + React 19** client that signs users in, lets them browse their chat history, and talk to large-language-model providers through a single interface.
 
-```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
-```
+---
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+## Layout and State Management
 
-You can start editing the page by modifying `pages/index.js`. The page auto-updates as you edit the file.
+- The custom `_app` wraps every non-auth page with:
+    - `AuthProvider`
+    - `ProtectedRoute`
+    - Left-hand `Sidebar`
 
-[API routes](https://nextjs.org/docs/pages/building-your-application/routing/api-routes) can be accessed on [http://localhost:3000/api/hello](http://localhost:3000/api/hello). This endpoint can be edited in `pages/api/hello.js`.
+  → Ensures authenticated screens always share the same layout while `/login` and `/register` stay bare-bones.
 
-The `pages/api` directory is mapped to `/api/*`. Files in this directory are treated as [API routes](https://nextjs.org/docs/pages/building-your-application/routing/api-routes) instead of React pages.
+- **Authentication state** is stored in `AuthContext`.  
+  It:
+    - Hydrates tokens from `localStorage`
+    - Decorates Axios with the bearer token
+    - Exposes login/logout helpers
+    - Redirects to `/login` when a session goes missing
 
-This project uses [`next/font`](https://nextjs.org/docs/pages/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+---
 
-## Learn More
+## Page Tour
 
-To learn more about Next.js, take a look at the following resources:
+- **`/login`** – Username/password form that calls the login helper, shows inline errors, and links new users to registration.
+- **`/register`** – Collects profile details, posts to `/api/auth/signup`, and confirms success before sending users back to the sign-in screen.
+- **`/chat/[id]`** – Main conversation view:
+    - Polls the REST backend for messages
+    - Normalises them into assistant/user bubbles
+    - Lets you pick an AI provider + model
+    - Uses the Composer to send replies to `/api/messages`
+- **`/`** – Currently an empty placeholder; once logged in you’ll see the sidebar but no main content yet.
+- **`/api/hello`** – Default Next.js sample endpoint kept from the starter template.
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn-pages-router) - an interactive Next.js tutorial.
+---
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+## Shared Interface Pieces
 
-## Deploy on Vercel
+- **Sidebar** – Loads the signed-in user’s chats from `/api/chats/users/{userId}/chats`, highlights the active thread, spawns new chats, opens Settings, and provides a logout button.
+- **Composer** – Grows with your text, sends messages to `/api/messages`, and supports Enter-to-send with optional cancel mid-flight.
+- **Settings dialog** – Two-tab modal for changing email/password or basic billing/profile details; it pulls the current profile on open and persists edits back to `/api/users/me`.
+- **ProtectedRoute** – Simple gatekeeper that waits for auth hydration before redirecting unauthenticated visitors to `/login`.
+- **ThemeContext** – Provides a light/dark/system toggle and applies it to the document root (available for future UI work).
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+---
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/pages/building-your-application/deploying) for more details.
+## Backend Integration
+
+- All API calls go through `src/lib/api.js`:
+    - Base URL: `http://localhost:8080`
+    - Automatically attaches the stored bearer token
+    - Shares Axios configuration across the app
+
+👉 Adjust that base URL if your backend runs elsewhere.
+
+---
+
+## Running Locally
+
+1. Install dependencies with your preferred Node package manager:
+
+   ```bash
+   npm install
+   # or
+   pnpm install
