@@ -81,23 +81,23 @@ KoraGPT is a **Next.js 15 + React 19** client that signs users in, lets them bro
 ## Screenshots
 
 #### Login & Register Page:
-![login.png](img/login.png)
+![login.png](public/login.png)
 
-![register.png](img/register.png)
+![register.png](public/register.png)
 
 #### Home Page
-![home_page.png](img/home_page.png)
+![home_page.png](public/home_page.png)
 
 #### New Chat
 
-![new_chat.png](img/new_chat.png)
+![new_chat.png](public/new_chat.png)
 
 #### OpenAI and Gemini test:
 
-![openai_text.png](img/openai_text.png)
-![gemini_text.png](img/gemini_text.png)
+![openai_text.png](public/openai_text.png)
+![gemini_text.png](public/gemini_text.png)
 
 #### Settings page:
 
-![settings1.png](img/settings1.png)
-![settings2.png](img/settings2.png)
+![settings1.png](public/settings1.png)
+![settings2.png](public/settings2.png)
