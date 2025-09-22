@@ -7,43 +7,52 @@ import api from "@/lib/api";
 import { useAuth } from "@/context/AuthContext";
 import Composer from "@/components/Composer";
 
+const PROVIDERS = ["OpenAI", "Google"]; // extend later if you add more
+
 export default function ChatPage() {
     const { query } = useRouter();
     const chatId = query.id;
-
     const { ready, token } = useAuth();
 
     const [loading, setLoading] = useState(true);
     const [err, setErr] = useState(null);
     const [messages, setMessages] = useState([]);
 
-    // models state
-    const [models, setModels] = useState([]); // [{ model, display_name }]
-    const [model, setModel] = useState("");   // selected model
+    // provider + models state
+    const [provider, setProvider] = useState(PROVIDERS[0]); // default to OpenAI
+    const [models, setModels] = useState([]);               // [{ model, display_name }]
+    const [model, setModel] = useState("");                 // selected model
 
     const scrollRef = useRef(null);
 
-    // fetch available models (after auth ready)
+    // fetch available models for the selected provider (after auth ready)
     useEffect(() => {
-        if (!ready || !token) return;
+        if (!ready || !token || !provider) return;
         let active = true;
 
         (async () => {
             try {
-                const res = await api.get(`/api/modelsai/OpenAI`);
+                // e.g. /api/modelsai/OpenAI or /api/modelsai/Gemini
+                const res = await api.get(`/api/modelsai/${encodeURIComponent(provider)}`);
                 const arr = Array.isArray(res.data) ? res.data : [];
                 if (!active) return;
+
                 setModels(arr);
-                if (!model && arr.length > 0) setModel(arr[0].model);
+                // if current model isn't in the new list, pick the first one
+                const exists = arr.some((m) => m.model === model);
+                if (!exists) {
+                    setModel(arr[0]?.model || "");
+                }
             } catch (e) {
-                console.error("Failed to load models", e);
+                console.error(`Failed to load models for ${provider}`, e);
+                setModels([]);
+                setModel("");
             }
         })();
 
-        return () => {
-            active = false;
-        };
-    }, [ready, token, model]);
+        return () => { active = false; };
+        // include provider; no need to include `model` in deps (we reconcile inside)
+    }, [ready, token, provider]);
 
     // normalize + fetch messages
     const fetchMessages = useCallback(async () => {
@@ -66,17 +75,19 @@ export default function ChatPage() {
         }
     }, [chatId, ready, token]);
 
-    // initial + polling (only when auth is ready)
+    // initial + polling
     useEffect(() => {
         if (!chatId || !ready || !token) return;
         let active = true;
         fetchMessages();
-        const interval = setInterval(() => {
-            if (active) fetchMessages();
-        }, 3000);
+        const id = setInterval(() => {
+            if (active && document.visibilityState === "visible") fetchMessages();
+        }, 8000);
+        window.addEventListener("focus", fetchMessages);
         return () => {
             active = false;
-            clearInterval(interval);
+            clearInterval(id);
+            window.removeEventListener("focus", fetchMessages);
         };
     }, [chatId, ready, token, fetchMessages]);
 
@@ -86,30 +97,50 @@ export default function ChatPage() {
         scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
     }, [messages.length]);
 
-    if (!ready) return null; // wait until auth state is hydrated
+    if (!ready) return null;
     if (loading) return <div className="p-6 text-slate-500">Loading chat…</div>;
     if (err) return <div className="p-6 text-red-600">Error: {err}</div>;
 
     return (
         <div className="h-full w-full flex flex-col">
-            {/* header with model dropdown */}
-            <header className="px-6 py-4 border-b bg-slate-50 flex items-center gap-2">
-                <label htmlFor="model-select" className="text-sm font-medium text-black">
-                    Model:
-                </label>
-                <select
-                    id="model-select"
-                    value={model}
-                    onChange={(e) => setModel(e.target.value)}
-                    className="border rounded px-2 py-1 text-sm text-black bg-white"
-                    disabled={models.length === 0}
-                >
-                    {models.map((m) => (
-                        <option key={m.model} value={m.model} className="text-black">
-                            {m.display_name ?? m.model}
-                        </option>
-                    ))}
-                </select>
+            {/* Header with provider + model dropdowns */}
+            <header className="px-6 py-4 border-b bg-slate-50 flex items-center gap-3">
+                <div className="flex items-center gap-2">
+                    <label htmlFor="provider-select" className="text-sm font-medium text-black">
+                        Provider:
+                    </label>
+                    <select
+                        id="provider-select"
+                        value={provider}
+                        onChange={(e) => setProvider(e.target.value)}
+                        className="border rounded px-2 py-1 text-sm text-black bg-white"
+                    >
+                        {PROVIDERS.map((p) => (
+                            <option key={p} value={p} className="text-black">
+                                {p}
+                            </option>
+                        ))}
+                    </select>
+                </div>
+
+                <div className="flex items-center gap-2">
+                    <label htmlFor="model-select" className="text-sm font-medium text-black">
+                        Model:
+                    </label>
+                    <select
+                        id="model-select"
+                        value={model}
+                        onChange={(e) => setModel(e.target.value)}
+                        className="border rounded px-2 py-1 text-sm text-black bg-white"
+                        disabled={models.length === 0}
+                    >
+                        {models.map((m) => (
+                            <option key={m.model} value={m.model} className="text-black">
+                                {m.display_name ?? m.model}
+                            </option>
+                        ))}
+                    </select>
+                </div>
             </header>
 
             <div ref={scrollRef} className="flex-1 overflow-auto p-6 space-y-1">
@@ -119,10 +150,8 @@ export default function ChatPage() {
 
                     const base =
                         "max-w-[75%] px-4 py-3 rounded-2xl shadow-sm whitespace-pre-wrap break-words";
-                    const userCls =
-                        "ml-auto bg-blue-600 text-white rounded-br-none"; // user on RIGHT
-                    const aiCls =
-                        "bg-white text-black border border-slate-200 rounded-bl-none"; // assistant on LEFT
+                    const userCls = "ml-auto bg-blue-600 text-white rounded-br-none";
+                    const aiCls = "bg-white text-black border border-slate-200 rounded-bl-none";
 
                     return (
                         <div
@@ -137,6 +166,7 @@ export default function ChatPage() {
                 })}
             </div>
 
+            {/* Composer will send the selected model; no need to send provider unless your backend requires it */}
             <Composer chatId={chatId} model={model} onSent={fetchMessages} />
         </div>
     );

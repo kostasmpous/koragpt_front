@@ -7,15 +7,17 @@ import { Plus, Sparkles, Moon, Settings, RotateCcw, Loader2, LogOut } from "luci
 import { useEffect, useRef, useState } from "react";
 import api from "@/lib/api";
 import { useAuth } from "@/context/AuthContext";
+import SettingsDialog from "@/components/SettingsDialog";
 
-const REFRESH_MS = 8000; // sensible poll
+
+const REFRESH_MS = 8000000;
 const ERROR_BACKOFF_MS = 4000;
 
 export default function Sidebar() {
     const router = useRouter();
     const { user, logout, ready } = useAuth();     // 🔐 wait for auth hydration
     const userId = user?.id;
-
+    const [showSettings, setShowSettings] = useState(false);
     const activeId = router.pathname.startsWith("/chat/") ? router.query?.id : null;
 
     const [chats, setChats] = useState([]);
@@ -197,17 +199,15 @@ export default function Sidebar() {
 
             {/* Bottom Section */}
             <div className="space-y-2 text-sm">
-                <button className="flex items-center gap-2 px-2 py-1 hover:bg-blue-200 rounded-md w-full">
-                    <Sparkles className="w-4 h-4" /> Customize
-                </button>
-                <button className="flex items-center gap-2 px-2 py-1 hover:bg-blue-200 rounded-md w-full">
-                    <Moon className="w-4 h-4" /> Dark Mode
-                </button>
-                <button className="flex items-center gap-2 px-2 py-1 hover:bg-blue-200 rounded-md w-full">
-                    <Settings className="w-4 h-4" /> Settings
+
+                <button className="flex items-center gap-2 px-2 py-1 hover:bg-blue-200 rounded-md w-full"
+
+                onClick={() => setShowSettings(true)}>
+                <Settings className="w-4 h-4" /> Settings
                 </button>
                 <div className="mt-3 text-xs text-blue-500">Free Plan 🌟</div>
             </div>
+        <SettingsDialog open={showSettings} onClose={() => setShowSettings(false)} />
         </aside>
     );
 }

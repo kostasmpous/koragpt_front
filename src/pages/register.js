@@ -1,10 +1,11 @@
-// src/pages/register.js
 "use client";
 import { useState } from "react";
 import Link from "next/link";
 import api from "@/lib/api";
 
 export default function Register() {
+    const [firstName, setFirstName] = useState("");
+    const [lastName, setLastName] = useState("");
     const [username, setU] = useState("");
     const [email, setE] = useState("");
     const [password, setP] = useState("");
@@ -20,6 +21,8 @@ export default function Register() {
 
         try {
             await api.post("/api/auth/signup", {
+                first_name: firstName,
+                last_name: lastName,
                 username,
                 email,
                 password,
@@ -53,6 +56,20 @@ export default function Register() {
                     </div>
                 )}
 
+                <input
+                    className="w-full border rounded-md px-3 py-2 text-black"
+                    placeholder="First name"
+                    value={firstName}
+                    onChange={(e) => setFirstName(e.target.value)}
+                    required
+                />
+                <input
+                    className="w-full border rounded-md px-3 py-2 text-black"
+                    placeholder="Last name"
+                    value={lastName}
+                    onChange={(e) => setLastName(e.target.value)}
+                    required
+                />
                 <input
                     className="w-full border rounded-md px-3 py-2 text-black"
                     placeholder="Username"
