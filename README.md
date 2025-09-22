@@ -33,8 +33,11 @@ KoraGPT is a **Next.js 15 + React 19** client that signs users in, lets them bro
     - Normalises them into assistant/user bubbles
     - Lets you pick an AI provider + model
     - Uses the Composer to send replies to `/api/messages`
-- **`/`** – Currently an empty placeholder; once logged in you’ll see the sidebar but no main content yet.
-- **`/api/hello`** – Default Next.js sample endpoint kept from the starter template.
+- **`SettingsDialog`** – User settings:
+  - Two-tab dialog for **Security** (email/password) and **Billing/Profile** (name, address, etc.)
+  - Fetches current profile from `/api/users/me` when opened
+  - Saves updates via `PATCH /api/users/me` and `POST /api/users/me/password`
+
 
 ---
 
@@ -66,4 +69,35 @@ KoraGPT is a **Next.js 15 + React 19** client that signs users in, lets them bro
    npm install
    # or
    pnpm install
-```
+    ```
+2. Start the dev server with 
+   ```bash
+   npm run dev
+    ```
+    then visit http://localhost:3000.
+
+---
+
+## Screenshots
+
+#### Login & Register Page:
+![login.png](img/login.png)
+
+![register.png](img/register.png)
+
+#### Home Page
+![home_page.png](img/home_page.png)
+
+#### New Chat
+
+![new_chat.png](img/new_chat.png)
+
+#### OpenAI and Gemini test:
+
+![openai_text.png](img/openai_text.png)
+![gemini_text.png](img/gemini_text.png)
+
+#### Settings page:
+
+![settings1.png](img/settings1.png)
+![settings2.png](img/settings2.png)
