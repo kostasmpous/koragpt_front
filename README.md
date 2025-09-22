@@ -1,6 +1,6 @@
 # KoraGPT Frontend
 
-> ⚡️ The frontend for this project is here: [koragpt_back](https://github.com/kostasmpous/koragpt_back)
+> ⚡️ The backend for this project is here: [koragpt_back](https://github.com/kostasmpous/koragpt_back)
 
 KoraGPT is a **Next.js 15 + React 19** client that signs users in, lets them browse their chat history, and talk to large-language-model providers through a single interface.
 
@@ -67,3 +67,4 @@ KoraGPT is a **Next.js 15 + React 19** client that signs users in, lets them bro
    npm install
    # or
    pnpm install
+```
