@@ -44,7 +44,6 @@ KoraGPT is a **Next.js 15 + React 19** client that signs users in, lets them bro
 - **Composer** – Grows with your text, sends messages to `/api/messages`, and supports Enter-to-send with optional cancel mid-flight.
 - **Settings dialog** – Two-tab modal for changing email/password or basic billing/profile details; it pulls the current profile on open and persists edits back to `/api/users/me`.
 - **ProtectedRoute** – Simple gatekeeper that waits for auth hydration before redirecting unauthenticated visitors to `/login`.
-- **ThemeContext** – Provides a light/dark/system toggle and applies it to the document root (available for future UI work).
 
 ---
 
